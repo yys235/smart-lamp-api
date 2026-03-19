@@ -1,0 +1,1 @@
+"""Smart Lamp API Application."""
