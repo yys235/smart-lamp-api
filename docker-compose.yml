@@ -1,0 +1,74 @@
+version: "3.9"
+
+services:
+  # Smart Lamp API Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: smartlamp-api:latest
+    container_name: smartlamp-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"   # HTTP API
+      - "${UDP_PORT:-41328}:41328/udp"  # UDP discovery
+      - "${TCP_PORT:-41330}:41330"      # TCP control
+    environment:
+      - HOST=0.0.0.0
+      - PORT=${PORT:-8000}
+      - UDP_PORT=${UDP_PORT:-41328}
+      - TCP_PORT=${TCP_PORT:-41330}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    env_file:
+      - .env
+    volumes:
+      # Mount logs directory for persistent logs
+      - ./logs:/app/logs
+      # Mount data directory for database persistence
+      - ./data:/app/data
+    networks:
+      - smartlamp-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Development mode service (hot reload)
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: smartlamp-api:dev
+    container_name: smartlamp-api-dev
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+      - "41329:41328/udp"
+      - "41331:41330"
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      # Mount source code for hot reload
+      - ./app:/app/app
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - smartlamp-network
+    profiles:
+      - dev
+
+networks:
+  smartlamp-network:
+    driver: bridge
+    name: smartlamp-network
+
+volumes:
+  logs:
+  data:
